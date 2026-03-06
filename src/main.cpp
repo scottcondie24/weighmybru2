@@ -28,6 +28,12 @@ uint8_t sleepTouchPin = TOUCH_SLEEP_PIN;  // Touch sensor for sleep functionalit
 uint8_t batteryPin = BATTERY_PIN;     // Battery voltage monitoring
 uint8_t sdaPin = I2C_SDA_PIN;         // I2C Data pin for display
 uint8_t sclPin = I2C_SCL_PIN;         // I2C Clock pin for display
+uint8_t tarePower = TOUCH_TARE_POWER_PIN;
+uint8_t sleepPower = TOUCH_SLEEP_POWER_PIN;
+uint8_t scalesPower1 = SCALES_POWER1_PIN;
+uint8_t scalesPower2 = SCALES_POWER2_PIN;
+uint8_t oledPower = OLED_POWER_PIN;
+
 float calibrationFactor = 4195.712891;
 Scale scale(dataPin, clockPin, calibrationFactor);
 FlowRate flowRate;
@@ -38,12 +44,43 @@ PowerManager powerManager(sleepTouchPin, &oledDisplay);
 BatteryMonitor batteryMonitor(batteryPin);
 
 void setup() {
+  pinMode(tarePower, OUTPUT);
+  digitalWrite(tarePower, HIGH);
+  pinMode(sleepPower, OUTPUT);
+  digitalWrite(sleepPower, HIGH);
+  pinMode(scalesPower1, OUTPUT);
+  digitalWrite(scalesPower1, HIGH);
+  pinMode(scalesPower2, OUTPUT);
+  digitalWrite(scalesPower2, HIGH);
+  pinMode(oledPower, OUTPUT);
+  digitalWrite(oledPower, HIGH);
+
   Serial.begin(115200);
   
+  int serialCount = 0;
+  while(!Serial) {
+    delay(10); // Wait for serial port to be available
+    serialCount++;
+    if (serialCount > 20) { // Wait up to 2 seconds
+      Serial.println("Serial port not available - continuing without serial output");
+      break;
+    }
+  }
   // Set CPU frequency explicitly for power optimization
   setCpuFrequencyMhz(80);
-  Serial.printf("CPU frequency set to: %dMHz for power optimization\n", getCpuFrequencyMhz());
   
+  // Link scale and flow rate for tare operation coordination
+  scale.setFlowRatePtr(&flowRate);
+
+  // Check for factory reset request (hold touch pin during boot)
+  pinMode(touchPin, INPUT_PULLDOWN);
+  if (digitalRead(touchPin) == HIGH) {
+    Serial.println("FACTORY RESET: Touch pin held during boot - clearing WiFi credentials");
+    clearWiFiCredentials();
+    delay(1000);
+  }
+
+  Serial.printf("CPU frequency set to: %dMHz for power optimization\n", getCpuFrequencyMhz());
   // Version and board identification
   Serial.println("=================================");
   Serial.printf("WeighMyBru² v%s\n", WEIGHMYBRU_VERSION_STRING);
@@ -53,17 +90,6 @@ void setup() {
   Serial.printf("Flash Size: %dMB\n", FLASH_SIZE_MB);
   Serial.printf("CPU Frequency: %dMHz (Power Optimized)\n", getCpuFrequencyMhz());
   Serial.println("=================================");
-  
-  // Link scale and flow rate for tare operation coordination
-  scale.setFlowRatePtr(&flowRate);
-  
-  // Check for factory reset request (hold touch pin during boot)
-  pinMode(touchPin, INPUT_PULLDOWN);
-  if (digitalRead(touchPin) == HIGH) {
-    Serial.println("FACTORY RESET: Touch pin held during boot - clearing WiFi credentials");
-    clearWiFiCredentials();
-    delay(1000);
-  }
   
   // CRITICAL: Initialize BLE FIRST before WiFi to prevent radio conflicts
   Serial.println("Initializing BLE FIRST for GaggiMate compatibility...");
@@ -91,7 +117,7 @@ void setup() {
   } else {
     Serial.println("Display initialized - ready for visual feedback");
     // Set reduced brightness for power optimization
-    oledDisplay.setBrightness(128);  // 50% brightness vs 255 max
+    oledDisplay.setBrightness(1);  // 50% brightness vs 255 max
     Serial.println("Display brightness set to 50% for power optimization");
   }
   
@@ -205,7 +231,8 @@ void setup() {
     }
     
     Serial.println("Forcing deep sleep now...");
-    esp_deep_sleep_start();
+    
+    powerManager.enterDeepSleep();
   }
   
   Serial.printf("Battery voltage OK (%.2fV) - continuing boot\n", batteryVoltage);
@@ -249,13 +276,35 @@ void loop() {
   static unsigned long lastWeightUpdate = 0;
   static unsigned long lastWiFiCheck = 0;
   static unsigned long lastDisplayUpdate = 0;
+  static unsigned long lastDisplayBrightnessUpdate = 0;
+  static int displayBrightness = 1;
   
   // Update weight at reduced frequency for power optimization
   if (millis() - lastWeightUpdate >= 50) { // Reduced from 20ms to 50ms (20Hz from 50Hz)
     float weight = scale.getWeight();
     flowRate.update(weight);
     lastWeightUpdate = millis();
+    //displayBrightness++;
+    //if (displayBrightness >= 256) { // Every 20 weight updates (1 second at 50Hz)
+    //  displayBrightness = 0;
+    //}
+    //oledDisplay.setBrightness(displayBrightness);
   }
+
+  /*if (millis() - lastDisplayBrightnessUpdate >= 2000) {
+    lastDisplayBrightnessUpdate = millis();
+    if(displayBrightness == 1) {
+      displayBrightness = 255;
+    } 
+    else if(displayBrightness == 255) {
+      displayBrightness = 128;
+    }
+    else {
+      displayBrightness = 1;
+    }
+    
+    oledDisplay.setBrightness(displayBrightness);
+  }*/
   
   static unsigned long lastBLEUpdate = 0;
   
@@ -285,10 +334,11 @@ void loop() {
   
   // Update display less frequently for power saving
   if (millis() - lastDisplayUpdate >= 100) { // Reduced display refresh rate to 10Hz
-    oledDisplay.update();
     lastDisplayUpdate = millis();
+    oledDisplay.update();
   }
   
   // Increased delay for better power efficiency while maintaining responsiveness
   delay(10); // Optimized delay: 10ms for good responsiveness with power savings
+  yield();
 }

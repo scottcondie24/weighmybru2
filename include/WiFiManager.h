@@ -7,7 +7,7 @@
 
 // Configuration for SuperMini antenna fix
 // Set to true to enable maximum power mode for boards with poor antenna design
-#define ENABLE_SUPERMINI_ANTENNA_FIX true
+#define ENABLE_SUPERMINI_ANTENNA_FIX false
 
 void setupWiFi();
 void saveWiFiCredentials(const char* ssid, const char* password);

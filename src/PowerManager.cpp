@@ -1,5 +1,11 @@
 #include "PowerManager.h"
 #include "Display.h"
+#include <WiFi.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+#include "driver/rtc_io.h"
+
+bool currentSleepTouchState = false;
 
 PowerManager::PowerManager(uint8_t sleepTouchPin, Display* display) 
     : sleepTouchPin(sleepTouchPin), displayPtr(display), sleepTouchThreshold(0),
@@ -13,18 +19,11 @@ void PowerManager::begin() {
     // Set up the pin as digital input with pull-down resistor for the digital touch sensor module
     // This prevents false triggers when no touch sensor is connected
     pinMode(sleepTouchPin, INPUT_PULLDOWN);
-    
-    // Configure external wake-up on the touch pin
-    // Wake up when pin goes HIGH (touch sensor outputs HIGH when touched)
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)sleepTouchPin, 1);
-    
-    Serial.println("Power Manager initialized. Sleep touch sensor on GPIO" + String(sleepTouchPin));
-    Serial.println("Using EXT0 wake-up (digital touch sensor) with pull-down resistor");
-    Serial.println("Device will wake up when touch sensor outputs HIGH");
+    Serial.println("Power Manager initialized");
 }
 
 void PowerManager::update() {
-    bool currentSleepTouchState = isSleepTouchPressed();
+    currentSleepTouchState = isSleepTouchPressed();
     unsigned long currentTime = millis();
     
     // Clear recent cancellation flag after 1 second
@@ -108,16 +107,19 @@ void PowerManager::enterDeepSleep() {
         displayPtr->showGoingToSleepMessage();
         delay(2000);
         displayPtr->clear();
+        displayPtr->setPowerSave(1); //0 is 0.53mA, 1 is 7.6uA
     }
     
     // Print wake-up configuration for debugging
-    Serial.println("Wake-up configured for EXT0 on GPIO" + String(sleepTouchPin));
+    Serial.println("Wake-up configured for EXT1 on GPIO" + String(sleepTouchPin));
     Serial.println("Will wake when pin goes HIGH");
-    
+
     // Flush serial output
-    Serial.flush();
+    //Serial.flush();
+    delay(1000);
+
+    esp_sleep_enable_ext1_wakeup(1ULL << sleepTouchPin, ESP_EXT1_WAKEUP_ANY_HIGH);
     
-    // Enter deep sleep - will wake up on external signal
     esp_deep_sleep_start();
 }
 

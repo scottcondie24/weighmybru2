@@ -5,6 +5,8 @@
 #include <NimBLEUtils.h>
 #include "Scale.h"
 
+#define BLE_POWER ESP_PWR_LVL_N12 // ESP_PWR_LVL_N0 Moderate power reduction (0dBm)
+
 class Display; // Forward declaration
 
 enum class WeighMyBruMessageType : uint8_t {

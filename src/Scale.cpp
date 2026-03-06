@@ -55,6 +55,7 @@ bool Scale::begin() {
     // Try to get a reading with 3 second timeout
     while (millis() - startTime < 3000) {
         if (hx711.is_ready()) {
+            Serial.println("HX711 ready, reading");
             long testReading = hx711.read();
             if (testReading != 0) {  // HX711 returns 0 when not connected
                 testPassed = true;
@@ -63,6 +64,7 @@ bool Scale::begin() {
             }
         }
         delay(100);  // Small delay between attempts
+        yield();
     }
     
     if (testPassed) {

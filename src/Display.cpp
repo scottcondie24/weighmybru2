@@ -7,6 +7,9 @@
 #include <WiFi.h>
 #include "WiFiManager.h"
 
+extern bool currentSleepTouchState;
+extern bool currentTouchState;
+
 Display::Display(uint8_t sdaPin, uint8_t sclPin, Scale* scale, FlowRate* flowRate)
     : sdaPin(sdaPin), sclPin(sclPin), scalePtr(scale), flowRatePtr(flowRate), bluetoothPtr(nullptr), powerManagerPtr(nullptr), batteryPtr(nullptr), wifiManagerPtr(nullptr),
       messageStartTime(0), messageDuration(2000), showingMessage(false), 
@@ -38,6 +41,7 @@ bool Display::begin() {
         }
         delay(100);
         Wire.beginTransmission(SCREEN_ADDRESS);
+        yield();
     }
     
     if (!i2cResponding) {
@@ -100,6 +104,13 @@ bool Display::begin() {
     Serial.println("SSD1306 display initialized on SDA:" + String(sdaPin) + " SCL:" + String(sclPin));
     
     return true;
+}
+
+void Display::drawDisplay() {
+    display->drawPixel(0,SCREEN_HEIGHT - 1,currentSleepTouchState);
+    display->drawPixel(SCREEN_WIDTH - 1,SCREEN_HEIGHT - 1,currentTouchState);
+    
+    display->display();
 }
 
 void Display::setupDisplay() {
@@ -187,9 +198,10 @@ void Display::showMessage(const String& message, int duration) {
         display->setCursor(0, currentLine * lineHeight);
         display->print(line);
         currentLine++;
+        yield();
     }
     
-    display->display();
+    drawDisplay();
     
     // Update duration for this message
     if (duration > 0) {
@@ -285,7 +297,7 @@ void Display::showSleepCountdown(int seconds) {
     display->setCursor(centerX2, line2Y);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::showSleepMessage() {
@@ -327,7 +339,7 @@ void Display::showSleepMessage() {
     display->setCursor(centerX2, 24);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::showGoingToSleepMessage() {
@@ -373,7 +385,7 @@ void Display::showGoingToSleepMessage() {
     display->setCursor(centerX2, line2Y);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::showSleepCancelledMessage() {
@@ -419,7 +431,7 @@ void Display::showSleepCancelledMessage() {
     display->setCursor(centerX2, line2Y);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::showTaringMessage() {
@@ -466,7 +478,7 @@ void Display::showTaringMessage() {
     display->setCursor(centerX2, line2Y);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::showTaredMessage() {
@@ -512,7 +524,7 @@ void Display::showTaredMessage() {
     display->setCursor(centerX2, line2Y);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::showWiFiStatusMessage(bool isEnabled) {
@@ -563,7 +575,7 @@ void Display::showWiFiStatusMessage(bool isEnabled) {
     display->setCursor(centerX2, line2Y);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::clearMessageState() {
@@ -610,8 +622,11 @@ void Display::showIPAddresses() {
     display->setCursor(centerX2, line2Y);
     display->print(line2);
     
-    display->display();
+    drawDisplay();
     delay(1000); // Show ready message for 1 second, then continue to normal display
+}
+void Display::setPowerSave(bool enable) {
+    display->ssd1306_command(enable ? 0xae : 0xaf);
 }
 
 void Display::clear() {
@@ -717,9 +732,9 @@ void Display::drawWeight(float weight) {
     // Apply deadband to prevent flickering between 0.0g and -0.0g
     // Show 0.0g (without negative sign) when weight is between -0.1g and +0.1g
     float displayWeight = weight;
-    if (weight >= -0.1 && weight <= 0.1) {
-        displayWeight = 0.0; // Force to exactly 0.0 to avoid negative sign
-    }
+    //if (weight >= -0.1 && weight <= 0.1) {
+    //    displayWeight = 0.0; // Force to exactly 0.0 to avoid negative sign
+    //}
     
     // Format weight string with consistent spacing (without "g" unit)
     String weightStr;
@@ -775,7 +790,7 @@ void Display::drawWeight(float weight) {
     // Draw battery status
     drawBatteryStatus();
     
-    display->display();
+    drawDisplay();
 }
 
 /*
@@ -784,6 +799,7 @@ Function removed as part of mode simplification - unified into showWeightWithFlo
 */
 
 void Display::showWeightWithFlowAndTimer(float weight) {
+    static float falseWeight = 0.0; // For simulating weight changes in testing
     // Return early if display is not connected
     if (!displayConnected) {
         return;
@@ -801,21 +817,25 @@ void Display::showWeightWithFlowAndTimer(float weight) {
     display->clearDisplay();
     
     // Apply deadband to prevent flickering between 0.0g and -0.0g
+    //falseWeight += 0.01; // Simulate weight changes for testing
+    //float displayWeight = falseWeight;
     float displayWeight = weight;
-    if (weight >= -0.1 && weight <= 0.1) {
-        displayWeight = 0.0;
-    }
+
+    //if (weight >= -0.1 && weight <= 0.1) {
+    //    displayWeight = 0.0;
+    //}
     
     // Split weight into integer and decimal parts for custom rendering
     bool isNegative = displayWeight < 0;
     float absWeight = abs(displayWeight);
-    int integerPart = (int)absWeight;
-    int decimalPart = (int)((absWeight - integerPart) * 10 + 0.5); // Round to 1 decimal
-    
-    // Handle carry-over when decimal part rounds to 10 (e.g., 4.95 -> 5.0)
-    if (decimalPart >= 10) {
-        integerPart += 1;
-        decimalPart = 0;
+
+    //2 decimal places for weights under 100g, and 1 decimal place for weights 100g and above pr negative and above 10g
+    int integerPart = (int)((absWeight) + 0.005);
+    int decimalPart = (int)((absWeight - integerPart) * 100 + 0.5);
+
+    if (absWeight >= 99.995f || (absWeight >= 9.995f && isNegative)) {
+        integerPart = (int)((absWeight) + 0.05);
+        decimalPart = (int)((absWeight - integerPart) * 10 + 0.5);
     }
     
     // Draw weight with custom decimal point - positioned at left middle
@@ -831,9 +851,13 @@ void Display::showWeightWithFlowAndTimer(float weight) {
         display->getTextBounds("-", 0, 0, &x1, &y1, &w, &h);
         currentX += w;
     }
-    
     // Draw integer part in size 3
-    String intStr = String(integerPart);
+    String intStr = "";
+    if(!isNegative && integerPart < 10) {
+        intStr = " " + String(integerPart);
+    } else {
+        intStr = String(integerPart);
+    }
     display->setCursor(currentX, weightY);
     display->print(intStr);
     
@@ -841,17 +865,27 @@ void Display::showWeightWithFlowAndTimer(float weight) {
     display->getTextBounds(intStr, 0, 0, &x1, &y1, &w, &h);
     currentX += w;
     
-    // Draw smaller decimal point (size 1) positioned to align with baseline
-    display->setTextSize(1);
-    display->setCursor(currentX, weightY + 11); // Offset from weight baseline for alignment
-    display->print(".");
-    display->getTextBounds(".", 0, 0, &x1, &y1, &w, &h);
-    currentX += w;
-    
-    // Draw decimal digit in size 2 for better readability
-    display->setTextSize(2);
-    display->setCursor(currentX, weightY + 3); // Positioned relative to weight baseline
-    display->print(String(decimalPart));
+    if(!(isNegative && integerPart >= 100)) {
+        // Draw smaller decimal point (size 1) positioned to align with baseline
+        display->setTextSize(1);
+        display->setCursor(currentX, weightY + 11); // Offset from weight baseline for alignment
+        display->print(".");
+        display->getTextBounds(".", 0, 0, &x1, &y1, &w, &h);
+        currentX += w;
+        
+        // Draw decimal digit in size 2 for better readability
+        display->setTextSize(2);
+        display->setCursor(currentX, weightY + 3); // Positioned relative to weight baseline
+
+        if (!isNegative && decimalPart < 10 && integerPart < 100) {
+            display->print("0"); // Leading zero for single-digit decimals
+        }
+        else if (isNegative && decimalPart < 10 && integerPart < 10) {
+            display->print("0"); // Leading zero for single-digit decimals in negative weights under 10g
+        }
+
+        display->print(String(decimalPart));
+    }
     
     // Right side: Timer and flow rate stacked (size 2)
     display->setTextSize(2);
@@ -966,8 +1000,8 @@ void Display::showWeightWithFlowAndTimer(float weight) {
     display->setTextSize(1);
     display->setCursor(flowLabelX, 16); // Far right position, below timer
     display->print("F");
-    
-    display->display();
+
+    drawDisplay();
 }
 
 // Timer management methods
@@ -1091,7 +1125,7 @@ void Display::showStatusPage() {
         display->print(WiFi.softAPIP().toString());
     }
     
-    display->display();
+    drawDisplay();
 }
 
 void Display::toggleStatusPage() {

@@ -19,12 +19,18 @@
 
 // Pin definitions (currently identical for both boards)
 #define HX711_DATA_PIN      5   // GPIO5 - HX711 Data pin
-#define HX711_CLOCK_PIN     6   // GPIO6 - HX711 Clock pin  
+#define HX711_CLOCK_PIN     6   // GPIO6 - HX711 Clock pin 
+#define TOUCH_TARE_POWER_PIN 1
 #define TOUCH_TARE_PIN      4   // GPIO4 - Touch sensor for tare (T0)
+#define TOUCH_SLEEP_POWER_PIN 2
 #define TOUCH_SLEEP_PIN     3   // GPIO3 - Touch sensor for sleep functionality
 #define BATTERY_PIN         7   // GPIO7 - Battery voltage monitoring (ADC1_CH6)
 #define I2C_SDA_PIN         8   // GPIO8 - I2C Data pin for display
 #define I2C_SCL_PIN         9   // GPIO9 - I2C Clock pin for display
+#define SCALES_POWER1_PIN   10
+#define SCALES_POWER2_PIN   11 
+#define OLED_POWER_PIN      12
+
 
 // Board-specific configurations
 #ifdef BOARD_TYPE_SUPERMINI

@@ -298,7 +298,9 @@ void setupWiFiForced() {
     delay(500); // Longer delay for complete reset
     
     // Apply SuperMini antenna fix for boards with poor antenna design
-    applySuperMiniAntennaFix();
+    if (ENABLE_SUPERMINI_ANTENNA_FIX) {
+        applySuperMiniAntennaFix();
+    }
     
     // Check if we have stored credentials - prioritize STA connection
     if (strlen(ssid) > 0) {
@@ -321,11 +323,11 @@ void setupWiFiForced() {
         
         // Wait for connection with reasonable timeout
         int connectionAttempts = 0;
-        const int maxAttempts = 24; // 12 seconds total - more time for reliable connection
+        const int maxAttempts = 240; // 12 seconds total - more time for reliable connection
         
         Serial.print("Connecting");
         while (WiFi.status() != WL_CONNECTED && connectionAttempts < maxAttempts) {
-            delay(500);
+            delay(50);
             Serial.print(".");
             connectionAttempts++;
             
@@ -338,6 +340,7 @@ void setupWiFiForced() {
                 Serial.println("\nConnection failed - likely incorrect password");
                 break;
             }
+            yield();
         }
         
         if (WiFi.status() == WL_CONNECTED) {
@@ -465,7 +468,7 @@ void printWiFiStatus() {
 
 void maintainWiFi() {
     // Skip maintenance if WiFi is disabled
-    if (!isWiFiEnabled()) {
+    if (!isWiFiEnabled() || WiFi.getMode() == WIFI_OFF) {
         return;
     }
     
@@ -494,10 +497,11 @@ void maintainWiFi() {
                     
                     // Wait briefly for reconnection - reduced timeout for faster fallback
                     int attempts = 0;
-                    while (WiFi.status() != WL_CONNECTED && attempts < 6) { // 3 second timeout
-                        delay(500);
+                    while (WiFi.status() != WL_CONNECTED && attempts < 60) { // 3 second timeout
+                        delay(50);
                         Serial.print(".");
                         attempts++;
+                        yield();
                     }
                     
                     if (WiFi.status() == WL_CONNECTED) {
@@ -577,6 +581,7 @@ bool attemptSTAConnection(const char* ssid, const char* password) {
             Serial.println("\nConnection failed - likely wrong password");
             return false;
         }
+        yield();
     }
     
     if (WiFi.status() == WL_CONNECTED) {

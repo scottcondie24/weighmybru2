@@ -39,26 +39,19 @@ void BatteryMonitor::update() {
     if (lastVoltage == 0.0f) {
         lastVoltage = newVoltage;  // First reading
     } else {
-        lastVoltage = (lastVoltage * 0.8f) + (newVoltage * 0.2f);  // 80/20 smoothing
+        lastVoltage = (lastVoltage * 0.9f) + (newVoltage * 0.1f);  // 90/10 smoothing
     }
+    
+    Serial.printf("Voltage: %.2fV\n", getBatteryVoltage());
     
     lastUpdate = currentTime;
 }
 
 float BatteryMonitor::readRawVoltage() {
-    // Take multiple readings for accuracy
-    int totalReading = 0;
-    const int samples = 10;
-    
-    for (int i = 0; i < samples; i++) {
-        totalReading += analogRead(batteryPin);
-        delayMicroseconds(100);  // Small delay between readings
-    }
-    
-    int avgReading = totalReading / samples;
-    
+    int reading = analogRead(batteryPin);
+
     // Convert ADC reading to voltage
-    float voltage = ((float)avgReading / ADC_RESOLUTION) * ADC_REFERENCE * VOLTAGE_DIVIDER_RATIO;
+    float voltage = ((float)reading / ADC_RESOLUTION) * ADC_REFERENCE * VOLTAGE_DIVIDER_RATIO;
     
     // Apply calibration offset
     voltage += calibrationOffset;

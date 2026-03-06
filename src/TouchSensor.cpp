@@ -4,6 +4,8 @@
 #include "FlowRate.h"
 #include "WiFiManager.h"
 
+bool currentTouchState = false;
+
 TouchSensor::TouchSensor(uint8_t touchPin, Scale* scale) 
     : touchPin(touchPin), scalePtr(scale), displayPtr(nullptr), flowRatePtr(nullptr), touchThreshold(30000), 
       lastTouchState(false), lastTouchTime(0), touchStartTime(0), debounceDelay(200),
@@ -18,7 +20,7 @@ void TouchSensor::begin() {
 }
 
 void TouchSensor::update() {
-    bool currentTouchState = isTouched();
+    currentTouchState = isTouched();
     unsigned long currentTime = millis();
     
     // Check for touch state change with debouncing

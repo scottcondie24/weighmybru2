@@ -31,6 +31,7 @@ public:
     void showIPAddresses(); // Show startup ready message
     void showStatusPage(); // Show status page with battery, BLE, WiFi, and scale status
     void toggleStatusPage(); // Toggle between main display and status page
+    void setPowerSave(bool enable);
     void clear();
     void setBrightness(uint8_t brightness);
     
@@ -91,6 +92,7 @@ private:
     void drawWeight(float weight);
     void showWeightWithFlowAndTimer(float weight); // Main display showing weight, flow rate, and timer
     void setupDisplay();
+    void drawDisplay();
     void drawBluetoothStatus(); // Draw Bluetooth connection status icon
     void drawBatteryStatus(); // Draw battery status with 3-segment indicator
 };
