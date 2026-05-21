@@ -2,13 +2,15 @@
 #include "Display.h"
 #include <WiFi.h>
 #include "soc/soc.h"
+#include "Scale.h"
+#include "soc/rtc.h"
 #include "soc/rtc_cntl_reg.h"
 #include "driver/rtc_io.h"
 
 bool currentSleepTouchState = false;
 
-PowerManager::PowerManager(uint8_t sleepTouchPin, Display* display) 
-    : sleepTouchPin(sleepTouchPin), displayPtr(display), sleepTouchThreshold(0),
+PowerManager::PowerManager(uint8_t sleepTouchPin, uint8_t clockPin, Display* display) 
+    : sleepTouchPin(sleepTouchPin), clockPin(clockPin), displayPtr(display), sleepTouchThreshold(0),
       lastSleepTouchState(false), lastSleepTouchTime(0), touchStartTime(0),
       debounceDelay(200), sleepCountdownStart(0), sleepCountdownActive(false),
       longPressDetected(false), cancelledRecently(false), cancelTime(0),
@@ -107,7 +109,7 @@ void PowerManager::enterDeepSleep() {
         displayPtr->showGoingToSleepMessage();
         delay(2000);
         displayPtr->clear();
-        displayPtr->setPowerSave(1); //0 is 0.53mA, 1 is 7.6uA
+        displayPtr->setPowerSave(1); //0 is 0.53mA, 1 is 7.6uA, not working with ssd1312
     }
     
     // Print wake-up configuration for debugging
@@ -115,8 +117,11 @@ void PowerManager::enterDeepSleep() {
     Serial.println("Will wake when pin goes HIGH");
 
     // Flush serial output
-    //Serial.flush();
+    Serial.flush();
     delay(1000);
+
+    digitalWrite(clockPin, HIGH);
+    gpio_hold_en((gpio_num_t) clockPin);
 
     esp_sleep_enable_ext1_wakeup(1ULL << sleepTouchPin, ESP_EXT1_WAKEUP_ANY_HIGH);
     
