@@ -15,9 +15,9 @@
 #include "BluetoothScale.h"
 #include "TouchSensor.h"
 #include "Display.h"
+#include "BoardConfig.h"
 #include "PowerManager.h"
 #include "BatteryMonitor.h"
-#include "BoardConfig.h"
 #include "Version.h"
 
 // Board-specific pin configuration
@@ -40,7 +40,7 @@ FlowRate flowRate;
 BluetoothScale bluetoothScale;
 TouchSensor touchSensor(touchPin, &scale);
 Display oledDisplay(sdaPin, sclPin, &scale, &flowRate);
-PowerManager powerManager(sleepTouchPin, &oledDisplay);
+PowerManager powerManager(sleepTouchPin, clockPin, &oledDisplay);
 BatteryMonitor batteryMonitor(batteryPin);
 
 void setup() {
@@ -54,6 +54,8 @@ void setup() {
   digitalWrite(scalesPower2, HIGH);
   pinMode(oledPower, OUTPUT);
   digitalWrite(oledPower, HIGH);
+
+  gpio_hold_dis((gpio_num_t) clockPin);
 
   Serial.begin(115200);
   
