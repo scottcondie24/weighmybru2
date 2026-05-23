@@ -16,7 +16,7 @@ jobs:
     
     strategy:
       matrix:
-        environment: [esp32s3-supermini, esp32s3-xiao]
+        environment: [esp32s3-supermini, esp32s3-xiao, esp32c6-xiao]
         
     steps:
     - name: Checkout repository
@@ -93,7 +93,11 @@ jobs:
         if [[ "${{ matrix.environment }}" == "esp32s3-supermini" ]]; then
           BOARD_SUFFIX="supermini"
         else
-          BOARD_SUFFIX="xiao"
+          if [[ "${{ matrix.environment }}" == "esp32c6-xiao" ]]; then
+            BOARD_SUFFIX="xiaoc6"
+          else
+            BOARD_SUFFIX="xiao"
+          fi
         fi
         
         # Copy and rename binaries with version
@@ -129,8 +133,13 @@ jobs:
           BOARD_NAME="WeighMyBru² - ESP32-S3 Supermini"
           CHIP_FAMILY="ESP32-S3"
         else
-          BOARD_NAME="WeighMyBru² - XIAO ESP32S3"  
-          CHIP_FAMILY="ESP32-S3"
+          if [[ "$BOARD_SUFFIX" == "xiaoc6" ]]; then
+            BOARD_NAME="WeighMyBru² - XIAO ESP32C6"
+            CHIP_FAMILY="ESP32-C6"
+          else
+            BOARD_NAME="WeighMyBru² - XIAO ESP32S3"  
+            CHIP_FAMILY="ESP32-S3"
+          fi
         fi
         
         # Create ESP32 Web Tools manifest
@@ -238,6 +247,11 @@ jobs:
           - `weighmybru-xiao-v${{ steps.version.outputs.VERSION }}.bin` - Main firmware  
           - `weighmybru-xiao-v${{ steps.version.outputs.VERSION }}-littlefs.bin` - Web interface files
           - `manifest-xiao.json` - ESP32 Web Tools manifest
+
+          **XIAO ESP32C6:**
+          - `weighmybru-xiaoc6-v${{ steps.version.outputs.VERSION }}.bin` - Main firmware
+          - `weighmybru-xiaoc6-v${{ steps.version.outputs.VERSION }}-littlefs.bin` - Web interface files
+          - `manifest-xiaoc6.json` - ESP32 Web Tools manifest
           
           ### 🚀 Installation Options
           
@@ -245,7 +259,7 @@ jobs:
           2. **Manual:** Download binaries and flash with esptool or PlatformIO
           
           ### 📋 Requirements
-          - ESP32-S3 Supermini or XIAO ESP32S3 board
+          - ESP32-S3 Supermini, XIAO ESP32S3 board or XIAO ESP32C6 board
           - Load cell and HX711 amplifier
           - See [README.md](https://github.com/031devstudios/weighmybru2/blob/master/README.md) for wiring
           

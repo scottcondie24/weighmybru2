@@ -4,6 +4,7 @@
 #include "BluetoothScale.h"
 #include "PowerManager.h"
 #include "BatteryMonitor.h"
+#include "BoardConfig.h"
 #include <WiFi.h>
 #include "WiFiManager.h"
 
@@ -23,7 +24,7 @@ bool Display::begin() {
     
     // Initialize I2C with custom pins
     Wire.begin(sdaPin, sclPin);
-    
+
     // Test I2C connection first with timeout
     Serial.println("Testing I2C connection to display...");
     unsigned long startTime = millis();

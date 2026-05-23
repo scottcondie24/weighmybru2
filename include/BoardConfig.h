@@ -10,27 +10,42 @@
 #elif defined(BOARD_XIAO)
   #define BOARD_NAME "XIAO ESP32S3" 
   #define BOARD_TYPE_XIAO
-  
+#elif defined(BOARD_XIAOC6)
+  #define BOARD_NAME "XIAO ESP32C6" 
+  #define BOARD_TYPE_XIAOC6
 #else
   #define BOARD_NAME "ESP32-S3 (Unknown)"
   #define BOARD_TYPE_SUPERMINI  // Default fallback
-  
 #endif
 
-// Pin definitions (currently identical for both boards)
+// Pin definitions
+#if defined(BOARD_TYPE_XIAOC6)
+#define HX711_DATA_PIN      19   // D9 - HX711 Data pin
+#define HX711_CLOCK_PIN     20   // D8 - HX711 Clock pin 
+#define TOUCH_TARE_POWER_PIN 1   // D1
+#define TOUCH_TARE_PIN      16   // D6 - Touch sensor for tare (T0)
+#define TOUCH_SLEEP_PIN     2   // D2 - Touch sensor for sleep functionality
+#define BATTERY_PIN         0   // D0 - Battery voltage monitoring (ADC1_CH6)
+#define I2C_SDA_PIN         22   // D4 - I2C Data pin for display
+#define I2C_SCL_PIN         23   // D5 - I2C Clock pin for display
+#define SCALES_POWER_PIN   18    // D10
+#define OLED_POWER_PIN      17   // D7
+                                  // D3
+#define ANTENNA_POWER_PIN   3
+#define ANTENNA_SELECT_PIN  14
+#else
 #define HX711_DATA_PIN      5   // GPIO5 - HX711 Data pin
 #define HX711_CLOCK_PIN     6   // GPIO6 - HX711 Clock pin 
 #define TOUCH_TARE_POWER_PIN 1
 #define TOUCH_TARE_PIN      4   // GPIO4 - Touch sensor for tare (T0)
-#define TOUCH_SLEEP_POWER_PIN 2
 #define TOUCH_SLEEP_PIN     3   // GPIO3 - Touch sensor for sleep functionality
 #define BATTERY_PIN         7   // GPIO7 - Battery voltage monitoring (ADC1_CH6)
 #define I2C_SDA_PIN         8   // GPIO8 - I2C Data pin for display
 #define I2C_SCL_PIN         9   // GPIO9 - I2C Clock pin for display
-#define SCALES_POWER1_PIN   10
-#define SCALES_POWER2_PIN   11 
-#define OLED_POWER_PIN      12
-
+#define SCALES_POWER_PIN    10
+#define OLED_POWER_PIN      11
+#define AUX_PIN             12
+#endif
 
 // Board-specific configurations
 #ifdef BOARD_TYPE_SUPERMINI
@@ -40,6 +55,10 @@
 #elif defined(BOARD_TYPE_XIAO)
   #define FLASH_SIZE_MB       8
   #define BOARD_DESCRIPTION   "XIAO ESP32S3 with 8MB Flash"
+  
+#elif defined(BOARD_TYPE_XIAOC6)
+  #define FLASH_SIZE_MB       4
+  #define BOARD_DESCRIPTION   "XIAO ESP32C6 with 4MB Flash"
   
 #endif
 

@@ -1,5 +1,6 @@
 #include "BluetoothScale.h"
 #include "Display.h"
+#include "BoardConfig.h"
 #include <Arduino.h>
 #include <stdexcept>
 #include <esp_bt.h>
@@ -40,21 +41,29 @@ void BluetoothScale::begin(Scale* scaleInstance) {
     // Add comprehensive error handling for BLE initialization
     bool initializationSuccessful = false;
     
+    delay(1000);
     try {
         Serial.println("BluetoothScale: Releasing Classic BT memory...");
         
+        delay(1000);
+
         // Release Classic Bluetooth memory more carefully
         esp_err_t ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
         if (ret != ESP_OK) {
             Serial.println("BluetoothScale: Warning - could not release Classic BT memory: " + String(esp_err_to_name(ret)));
         }
         
+        delay(1000);
+
         Serial.println("BluetoothScale: Initializing BLE device directly...");
         
         // Skip btStart() and go directly to BLE initialization
         // This avoids the problematic Bluetooth controller initialization
+        delay(1000);
+
         initializeBLE();
         
+        Serial.println("BluetoothScale: Initialized, now advertising...");
         // Small delay before starting advertising
         delay(200);
         
@@ -62,7 +71,7 @@ void BluetoothScale::begin(Scale* scaleInstance) {
         
         Serial.println("BluetoothScale: Successfully started advertising as WeighMyBru");
         initializationSuccessful = true;
-        
+        delay(200);
     } catch (const std::exception& e) {
         Serial.println("BluetoothScale: Exception during initialization: " + String(e.what()));
         scale = nullptr;
@@ -96,22 +105,30 @@ void BluetoothScale::end() {
 void BluetoothScale::initializeBLE() {
     Serial.println("BluetoothScale: Initializing BLE device...");
     Serial.printf("BluetoothScale: Free heap at start: %u bytes\n", ESP.getFreeHeap());
+
+    delay(1000);
     
     // Reduce BLE power consumption during initialization to prevent voltage sag
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, BLE_POWER);      // Advertising power
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_CONN_HDL0, BLE_POWER); // Connection power
+    #if !defined(BOARD_TYPE_XIAOC6)
+        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, BLE_POWER);      // Advertising power
+        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_CONN_HDL0, BLE_POWER); // Connection power
+        Serial.printf("BluetoothScale: Set BLE power to %d for initialization\n", BLE_POWER);
+        delay(1000);
+    #endif
     
     // Initialize BLE Device with WeighMyBru name - this handles the low-level BLE stack
     NimBLEDevice::init("WeighMyBru");
     
+    Serial.printf("BluetoothScale: init");
+    delay(1000);
+
     // Set moderate power to reduce current draw during boot while maintaining connectivity
     NimBLEDevice::setPower(BLE_POWER);  // BLE power
     
     // Small delay to let power settle
     delay(100);
-    
     Serial.printf("BluetoothScale: Free heap after NimBLEDevice::init: %u bytes\n", ESP.getFreeHeap());
-    
+
     Serial.println("BluetoothScale: Creating BLE server...");
     
     // Create BLE Server
@@ -180,8 +197,8 @@ void BluetoothScale::initializeBLE() {
     
     Serial.println("BluetoothScale: Starting service...");
     
-    // Start the service
-    service->start();
+    // Start the service no longer required for nimBLE 2.5.0
+    //service->start();
     
     Serial.println("BluetoothScale: Setting up advertising...");
     
@@ -195,8 +212,10 @@ void BluetoothScale::initializeBLE() {
     
     // Set proper connection interval preferences to avoid packet rejection
     // and ensure reliable discovery on all ESP32-S3 variants
-    advertising->setMinPreferred(0x06);  // 7.5 ms minimum interval
-    advertising->setMaxPreferred(0x12);  // 22.5 ms maximum interval
+    
+    // not applicable for nimBLE 2.5.0
+    //advertising->setMinPreferred(0x06);  // 7.5 ms minimum interval
+    //advertising->setMaxPreferred(0x12);  // 22.5 ms maximum interval
     
     Serial.println("BluetoothScale: BLE initialization completed successfully");
 }
@@ -494,19 +513,19 @@ void BluetoothScale::processIncomingMessage(uint8_t* data, size_t length) {
 }
 
 // BLE Server Callbacks
-void BluetoothScale::onConnect(NimBLEServer* pServer) {
+void BluetoothScale::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
     deviceConnected = true;
     NimBLEDevice::stopAdvertising();
     Serial.println("BluetoothScale: Device connected");
 }
 
-void BluetoothScale::onDisconnect(NimBLEServer* pServer) {
+void BluetoothScale::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
     deviceConnected = false;
     Serial.println("BluetoothScale: Device disconnected");
 }
 
 // BLE Characteristic Callbacks
-void BluetoothScale::onWrite(NimBLECharacteristic* pCharacteristic) {
+void BluetoothScale::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
     std::string value = pCharacteristic->getValue();
     
     if (value.length() > 0) {

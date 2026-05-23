@@ -12,7 +12,7 @@ jobs:
     
     strategy:
       matrix:
-        environment: [esp32s3-supermini, esp32s3-xiao]
+        environment: [esp32s3-supermini, esp32s3-xiao, esp32c6-xiao]
         
     steps:
     - name: Checkout repository

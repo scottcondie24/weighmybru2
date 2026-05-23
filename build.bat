@@ -171,6 +171,19 @@ echo [STEP] Building filesystem for esp32s3-xiao...
 python -m platformio run -e esp32s3-xiao -t buildfs
 echo [SUCCESS] Build complete for esp32s3-xiao
 
+rem Build XIAO ESP32C6
+echo [STEP] Building esp32c6-xiao...
+python -m platformio run -e esp32c6-xiao
+if errorlevel 1 (
+    echo [ERROR] Failed to build esp32c6-xiao
+    exit /b 1
+)
+
+echo [STEP] Building filesystem for esp32c6-xiao...
+python -m platformio run -e esp32c6-xiao -t buildfs
+echo [SUCCESS] Build complete for esp32c6-xiao
+
+
 rem Create output directory
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 
@@ -206,6 +219,23 @@ if exist ".pio\build\esp32s3-xiao\bootloader.bin" (
 )
 if exist ".pio\build\esp32s3-xiao\partitions.bin" (
     copy ".pio\build\esp32s3-xiao\partitions.bin" "%OUTPUT_DIR%\weighmybru-xiao-v%VERSION%-partitions.bin" >nul
+)
+
+rem Copy binaries for XIAOC6
+echo [STEP] Copying binaries for xiaoc6...
+if exist ".pio\build\esp32c6-xiao\firmware.bin" (
+    copy ".pio\build\esp32c6-xiao\firmware.bin" "%OUTPUT_DIR%\weighmybru-xiaoc6-v%VERSION%.bin" >nul
+    echo [SUCCESS] Copied firmware binary
+)
+if exist ".pio\build\esp32c6-xiao\littlefs.bin" (
+    copy ".pio\build\esp32c6-xiao\littlefs.bin" "%OUTPUT_DIR%\weighmybru-xiaoc6-v%VERSION%-littlefs.bin" >nul
+    echo [SUCCESS] Copied filesystem binary
+)
+if exist ".pio\build\esp32c6-xiao\bootloader.bin" (
+    copy ".pio\build\esp32c6-xiao\bootloader.bin" "%OUTPUT_DIR%\weighmybru-xiaoc6-v%VERSION%-bootloader.bin" >nul
+)
+if exist ".pio\build\esp32c6-xiao\partitions.bin" (
+    copy ".pio\build\esp32c6-xiao\partitions.bin" "%OUTPUT_DIR%\weighmybru-xiaoc6-v%VERSION%-partitions.bin" >nul
 )
 
 rem Generate ESP32 Web Tools manifests
@@ -249,6 +279,26 @@ echo     }>> "%OUTPUT_DIR%\manifest-xiao.json"
 echo   ]>> "%OUTPUT_DIR%\manifest-xiao.json"
 echo }>> "%OUTPUT_DIR%\manifest-xiao.json"
 
+echo [STEP] Generating ESP32 Web Tools manifest for xiaoc6...
+echo {> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo   "name": "WeighMyBru² - XIAO ESP32C6",>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo   "version": "%VERSION%",>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo   "home_assistant_domain": "weighmybru",>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo   "new_install_prompt_erase": true,>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo   "funding_url": "https://github.com/031devstudios/weighmybru2",>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo   "builds": [>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo     {>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo       "chipFamily": "ESP32-C6",>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo       "parts": [>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo         {"path": "weighmybru-xiaoc6-v%VERSION%-bootloader.bin", "offset": 0},>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo         {"path": "weighmybru-xiaoc6-v%VERSION%-partitions.bin", "offset": 32768},>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo         {"path": "weighmybru-xiaoc6-v%VERSION%.bin", "offset": 65536},>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo         {"path": "weighmybru-xiaoc6-v%VERSION%-littlefs.bin", "offset": 2686976}>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo       ]>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo     }>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo   ]>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+echo }>> "%OUTPUT_DIR%\manifest-xiaoc6.json"
+
 rem Generate build info
 echo [STEP] Generating build information...
 echo {> "%OUTPUT_DIR%\build-info.json"
@@ -259,7 +309,7 @@ echo   "commit_hash": "%COMMIT_HASH%",>> "%OUTPUT_DIR%\build-info.json"
 echo   "build_date": "%BUILD_DATE%",>> "%OUTPUT_DIR%\build-info.json"
 echo   "build_time": "%BUILD_TIME%",>> "%OUTPUT_DIR%\build-info.json"
 echo   "is_release": %IS_RELEASE%,>> "%OUTPUT_DIR%\build-info.json"
-echo   "environments": ["esp32s3-supermini", "esp32s3-xiao"]>> "%OUTPUT_DIR%\build-info.json"
+echo   "environments": ["esp32s3-supermini", "esp32s3-xiao", "esp32c6-xiao"]>> "%OUTPUT_DIR%\build-info.json"
 echo }>> "%OUTPUT_DIR%\build-info.json"
 
 echo.
@@ -277,9 +327,11 @@ echo.
 echo To flash firmware:
 echo   python -m platformio run -e esp32s3-supermini -t upload
 echo   python -m platformio run -e esp32s3-xiao -t upload
+echo   python -m platformio run -e esp32c6-xiao -t upload
 echo.
 echo To upload filesystem:
 echo   python -m platformio run -e esp32s3-supermini -t uploadfs
 echo   python -m platformio run -e esp32s3-xiao -t uploadfs
+echo   python -m platformio run -e esp32c6-xiao -t uploadfs
 
 endlocal

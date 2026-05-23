@@ -14,9 +14,9 @@
 #include "Calibration.h"
 #include "BluetoothScale.h"
 #include "TouchSensor.h"
-#include "Display.h"
 #include "BoardConfig.h"
 #include "PowerManager.h"
+#include "Display.h"
 #include "BatteryMonitor.h"
 #include "Version.h"
 
@@ -29,10 +29,14 @@ uint8_t batteryPin = BATTERY_PIN;     // Battery voltage monitoring
 uint8_t sdaPin = I2C_SDA_PIN;         // I2C Data pin for display
 uint8_t sclPin = I2C_SCL_PIN;         // I2C Clock pin for display
 uint8_t tarePower = TOUCH_TARE_POWER_PIN;
-uint8_t sleepPower = TOUCH_SLEEP_POWER_PIN;
-uint8_t scalesPower1 = SCALES_POWER1_PIN;
-uint8_t scalesPower2 = SCALES_POWER2_PIN;
+uint8_t scalesPower = SCALES_POWER_PIN;
 uint8_t oledPower = OLED_POWER_PIN;
+#if defined(BOARD_TYPE_XIAOC6)
+    uint8_t antennaPower = ANTENNA_POWER_PIN;
+    uint8_t antennaSelect = ANTENNA_SELECT_PIN;
+#else
+  uint8_t auxPin = AUX_PIN;
+#endif
 
 float calibrationFactor = 4195.712891;
 Scale scale(dataPin, clockPin, calibrationFactor);
@@ -46,14 +50,20 @@ BatteryMonitor batteryMonitor(batteryPin);
 void setup() {
   pinMode(tarePower, OUTPUT);
   digitalWrite(tarePower, HIGH);
-  pinMode(sleepPower, OUTPUT);
-  digitalWrite(sleepPower, HIGH);
-  pinMode(scalesPower1, OUTPUT);
-  digitalWrite(scalesPower1, HIGH);
-  pinMode(scalesPower2, OUTPUT);
-  digitalWrite(scalesPower2, HIGH);
+  pinMode(scalesPower, OUTPUT);
+  digitalWrite(scalesPower, HIGH);
   pinMode(oledPower, OUTPUT);
   digitalWrite(oledPower, HIGH);
+  #if defined(BOARD_TYPE_XIAOC6)
+    pinMode(antennaPower, OUTPUT);
+    digitalWrite(antennaPower, LOW);  // LOW to turn on
+    pinMode(antennaSelect, OUTPUT);
+    digitalWrite(antennaSelect, HIGH); // LOW internal antenna, HIGH external antenna
+  #else
+    pinMode(auxPin, OUTPUT);
+    digitalWrite(auxPin, HIGH);
+  #endif
+
 
   gpio_hold_dis((gpio_num_t) clockPin);
 
@@ -68,8 +78,13 @@ void setup() {
       break;
     }
   }
+  delay(5000);
   // Set CPU frequency explicitly for power optimization
-  setCpuFrequencyMhz(80);
+  #if defined(BOARD_TYPE_XIAOC6)
+    setCpuFrequencyMhz(80); // Reduce CPU frequency to 80MHz for better battery life    
+  #else
+    setCpuFrequencyMhz(80); // Reduce CPU frequency to 80MHz for better battery life    
+  #endif
   
   // Link scale and flow rate for tare operation coordination
   scale.setFlowRatePtr(&flowRate);
@@ -96,13 +111,19 @@ void setup() {
   // CRITICAL: Initialize BLE FIRST before WiFi to prevent radio conflicts
   Serial.println("Initializing BLE FIRST for GaggiMate compatibility...");
   Serial.printf("Free heap before BLE init: %u bytes\n", ESP.getFreeHeap());
-  Serial.printf("Free PSRAM before BLE init: %u bytes\n", ESP.getFreePsram());
-  
+  #ifdef BOARD_HAS_PSRAM
+    Serial.printf("Free PSRAM before BLE init: %u bytes\n", ESP.getFreePsram());
+  #endif
+
   try {
-    bluetoothScale.begin();  // Initialize BLE without scale reference
-    Serial.println("BLE initialized successfully - GaggiMate should be able to connect");
-    Serial.printf("Free heap after BLE init: %u bytes\n", ESP.getFreeHeap());
-    Serial.printf("Free PSRAM after BLE init: %u bytes\n", ESP.getFreePsram());
+    //#if !defined(BOARD_TYPE_XIAOC6)
+        
+      bluetoothScale.begin();  // Initialize BLE without scale reference
+      Serial.println("BLE initialized successfully - GaggiMate should be able to connect");
+    //#endif
+    #ifdef BOARD_HAS_PSRAM
+      Serial.printf("Free PSRAM after BLE init: %u bytes\n", ESP.getFreePsram());
+    #endif
   } catch (...) {
     Serial.println("BLE initialization failed - continuing without Bluetooth");
     Serial.printf("Free heap after BLE fail: %u bytes\n", ESP.getFreeHeap());
@@ -217,7 +238,7 @@ void setup() {
 
   // Check for low battery - prevent boot if voltage too low
   float batteryVoltage = batteryMonitor.getBatteryVoltage();
-  if (batteryVoltage < 3.2f && batteryVoltage > 0.1f) { // > 0.1f to avoid false readings
+  /*if (batteryVoltage < 3.2f && batteryVoltage > 0.1f) { // > 0.1f to avoid false readings
     Serial.printf("CRITICAL: Battery voltage too low (%.2fV) - entering sleep\n", batteryVoltage);
     
     // Show battery low message on display with large, centered formatting
@@ -235,7 +256,7 @@ void setup() {
     Serial.println("Forcing deep sleep now...");
     
     powerManager.enterDeepSleep();
-  }
+  }*/
   
   Serial.printf("Battery voltage OK (%.2fV) - continuing boot\n", batteryVoltage);
 
@@ -336,7 +357,13 @@ void loop() {
   
   // Update display less frequently for power saving
   if (millis() - lastDisplayUpdate >= 100) { // Reduced display refresh rate to 10Hz
-    lastDisplayUpdate = millis();
+    if (millis() - lastDisplayUpdate > 150) { // if refresh was delayed significantly keep a gap for next update, else keep 100ms intervals
+      lastDisplayUpdate = millis();
+    }
+    else {
+      lastDisplayUpdate += 100;
+    }
+
     oledDisplay.update();
   }
   

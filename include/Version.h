@@ -36,6 +36,8 @@
   #define WEIGHMYBRU_BOARD_NAME "ESP32-S3 Supermini"
 #elif defined(BOARD_XIAO)
   #define WEIGHMYBRU_BOARD_NAME "XIAO ESP32S3"
+#elif defined(BOARD_XIAOC6)
+  #define WEIGHMYBRU_BOARD_NAME "XIAO ESP32C6"
 #else
   #define WEIGHMYBRU_BOARD_NAME "Unknown ESP32"
 #endif

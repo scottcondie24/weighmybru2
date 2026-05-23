@@ -1,11 +1,14 @@
 #include "PowerManager.h"
 #include "Display.h"
+#include "BoardConfig.h"
 #include <WiFi.h>
 #include "soc/soc.h"
 #include "Scale.h"
 #include "soc/rtc.h"
-#include "soc/rtc_cntl_reg.h"
-#include "driver/rtc_io.h"
+//#if !defined(BOARD_TYPE_XIAOC6)
+//  #include "soc/rtc_cntl_reg.h"
+//  #include "driver/rtc_io.h"
+//#endif
 
 bool currentSleepTouchState = false;
 

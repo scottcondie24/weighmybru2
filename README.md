@@ -61,6 +61,7 @@ pio run -t uploadfs
 # Or use the specific environment for your board
 pio run -e esp32s3-supermini -t uploadfs  # For ESP32-S3 Supermini
 pio run -e esp32s3-xiao -t uploadfs       # For XIAO ESP32S3
+pio run -e esp32c6-xiao -t uploadfs       # For XIAO ESP32C6
 ```
 
 **Without the filesystem upload:**
@@ -77,6 +78,7 @@ For beginners, we now support **ESP32 Web Tools** for easy browser-based install
 3. **Click "Install Firmware"** and select your board:
    - ESP32-S3 Supermini
    - XIAO ESP32S3
+   - XIAO ESP32C6
 4. **Follow the prompts** - no software installation required!
 
 **Benefits:**

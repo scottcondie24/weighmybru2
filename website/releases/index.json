@@ -5,7 +5,8 @@
       "version": "2.2.0",
       "date": "2026-01-26",
       "supermini_manifest": "./v2.2.0/manifest-supermini.json",
-      "xiao_manifest": "./v2.2.0/manifest-xiao.json"
+      "xiao_manifest": "./v2.2.0/manifest-xiao.json",
+      "xiaoc6_manifest": "./v2.2.0/manifest-xiaoc6.json"
     }
   ]
 }

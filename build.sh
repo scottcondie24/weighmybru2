@@ -241,7 +241,7 @@ generate_build_info() {
   "build_time": "$BUILD_TIME",
   "is_release": ${IS_RELEASE:-false},
   "built_at": "$(date -u --iso-8601=seconds)",
-  "environments": ["esp32s3-supermini", "esp32s3-xiao"]
+  "environments": ["esp32s3-supermini", "esp32s3-xiao", "esp32c6-xiao"]
 }
 EOF
 
@@ -266,10 +266,12 @@ show_summary() {
     echo "To flash firmware:"
     echo "  pio run -e esp32s3-supermini -t upload"
     echo "  pio run -e esp32s3-xiao -t upload" 
+    echo "  pio run -e esp32c6-xiao -t upload"
     echo ""
     echo "To upload filesystem:"
     echo "  pio run -e esp32s3-supermini -t uploadfs"
     echo "  pio run -e esp32s3-xiao -t uploadfs"
+    echo "  pio run -e esp32c6-xiao -t uploadfs"
 }
 
 main() {
@@ -288,6 +290,10 @@ main() {
     build_environment "esp32s3-xiao" "xiao"
     copy_binaries "esp32s3-xiao" "xiao"
     generate_manifest "xiao" "WeighMyBru² - XIAO ESP32S3"
+    
+    build_environment "esp32c6-xiao" "xiaoc6"
+    copy_binaries "esp32c6-xiao" "xiaoc6"
+    generate_manifest "xiaoc6" "WeighMyBru² - XIAO ESP32C6"
     
     generate_build_info
     show_summary

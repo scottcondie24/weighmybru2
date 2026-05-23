@@ -5,7 +5,7 @@
 #include <NimBLEUtils.h>
 #include "Scale.h"
 
-#define BLE_POWER ESP_PWR_LVL_N12 // ESP_PWR_LVL_N0 Moderate power reduction (0dBm)
+#define BLE_POWER ESP_PWR_LVL_N0 //Moderate power reduction (0dBm)
 
 class Display; // Forward declaration
 
@@ -40,11 +40,11 @@ public:
     String getBluetoothConnectionInfo(); // Get detailed BLE connection information
     
     // BLE Server callbacks
-    void onConnect(NimBLEServer* pServer) override;
-    void onDisconnect(NimBLEServer* pServer) override;
-    
+    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override;
+    void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override;
+
     // BLE Characteristic callbacks
-    void onWrite(NimBLECharacteristic* pCharacteristic) override;
+    void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
 
 private:
     Scale* scale;

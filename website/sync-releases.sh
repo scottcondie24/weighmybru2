@@ -139,8 +139,10 @@ organize_release_files() {
     local required_files=(
         "manifest-supermini.json"
         "manifest-xiao.json"
+        "manifest-xiaoc6.json"
         "firmware-supermini.bin"
         "firmware-xiao.bin"
+        "firmware-xiaoc6.bin"
         "bootloader.bin"
         "partitions.bin"
         "spiffs.bin"

@@ -21,8 +21,10 @@ your-website/
 │   ├── latest/               # Latest release files (symlink or copy)
 │   │   ├── manifest-supermini.json
 │   │   ├── manifest-xiao.json
+│   │   ├── manifest-xiaoc6.json
 │   │   ├── firmware-supermini.bin
 │   │   ├── firmware-xiao.bin
+│   │   ├── firmware-xiaoc6.bin
 │   │   ├── bootloader.bin
 │   │   ├── partitions.bin
 │   │   └── spiffs.bin
