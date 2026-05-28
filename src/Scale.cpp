@@ -13,7 +13,7 @@ Scale::Scale(uint8_t dataPin, uint8_t clockPin, float calibrationFactor)
     }
 }
 
-bool Scale::begin() {
+void Scale::begin() {
     Serial.println("Starting scale initialization...");
     
     preferences.begin("scale", false);
@@ -46,14 +46,16 @@ bool Scale::begin() {
     Serial.println("Initializing HX711...");
     hx711.begin(dataPin, clockPin);
     hx711.set_scale(calibrationFactor);
-    
+}
+
+bool Scale::init() {
     // Test if HX711 is responding with a timeout
     Serial.println("Testing HX711 connection...");
     unsigned long startTime = millis();
     bool testPassed = false;
     
-    // Try to get a reading with 3 second timeout
-    while (millis() - startTime < 3000) {
+    // Try to get a reading with 5 second timeout
+    while (millis() - startTime < 5000) {
         if (hx711.is_ready()) {
             Serial.println("HX711 ready, reading");
             long testReading = hx711.read();

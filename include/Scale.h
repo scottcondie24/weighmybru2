@@ -7,7 +7,8 @@
 class Scale {
 public:
     Scale(uint8_t dataPin, uint8_t clockPin, float calibrationFactor);
-    bool begin();  // Returns true if successful, false if HX711 fails
+    void begin();
+    bool init();  // Returns true if successful, false if HX711 fails
     void tare(uint8_t times = 20);
     void set_scale(float factor);
     float getWeight();

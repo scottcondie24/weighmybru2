@@ -18,6 +18,7 @@ String getStoredSSID();
 String getStoredPassword();
 void setupWiFi(); // Setup WiFi based on saved preferences
 void setupWiFiForced(); // Force WiFi setup regardless of saved state (for power optimization)
+bool setupWiFiNonBlocking(); // Force WiFi setup regardless of saved state (for power optimization)
 void setupmDNS(); // Setup mDNS for weighmybru.local hostname
 void printWiFiStatus(); // Print detailed WiFi status for debugging
 void maintainWiFi(); // Periodic WiFi maintenance to ensure AP stability

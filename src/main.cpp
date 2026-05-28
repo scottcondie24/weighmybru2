@@ -3,6 +3,7 @@
 #include <LittleFS.h>
 #include <ESPmDNS.h>
 #include <esp_sleep.h>
+#include <esp_pm.h>
 #ifdef ESP_IDF_VERSION_MAJOR
     #include "esp_wifi.h"
     #include "esp_err.h"
@@ -31,6 +32,20 @@ uint8_t sclPin = I2C_SCL_PIN;         // I2C Clock pin for display
 uint8_t tarePower = TOUCH_TARE_POWER_PIN;
 uint8_t scalesPower = SCALES_POWER_PIN;
 uint8_t oledPower = OLED_POWER_PIN;
+
+enum wifi_state {
+    kInit,
+    kInitWait,
+    kStarting,
+    kStartWait,
+    kWaiting,
+    kConnected,
+    kActive,
+    kDisabled,
+};
+
+wifi_state wifiState = kInit;
+
 #if defined(BOARD_TYPE_XIAOC6)
     uint8_t antennaPower = ANTENNA_POWER_PIN;
     uint8_t antennaSelect = ANTENNA_SELECT_PIN;
@@ -48,6 +63,9 @@ PowerManager powerManager(sleepTouchPin, clockPin, &oledDisplay);
 BatteryMonitor batteryMonitor(batteryPin);
 
 void setup() {
+  unsigned long totalStartupTime = 0;
+  unsigned long startTime = 0;
+
   pinMode(tarePower, OUTPUT);
   digitalWrite(tarePower, HIGH);
   pinMode(scalesPower, OUTPUT);
@@ -58,7 +76,7 @@ void setup() {
     pinMode(antennaPower, OUTPUT);
     digitalWrite(antennaPower, LOW);  // LOW to turn on
     pinMode(antennaSelect, OUTPUT);
-    digitalWrite(antennaSelect, HIGH); // LOW internal antenna, HIGH external antenna
+    digitalWrite(antennaSelect, LOW); // LOW internal antenna, HIGH external antenna
   #else
     pinMode(auxPin, OUTPUT);
     digitalWrite(auxPin, HIGH);
@@ -68,20 +86,29 @@ void setup() {
   gpio_hold_dis((gpio_num_t) clockPin);
 
   Serial.begin(115200);
-  
+
+  /*
+  // Debugging
   int serialCount = 0;
   while(!Serial) {
-    delay(10); // Wait for serial port to be available
+    delay(100); // Wait for serial port to be available
     serialCount++;
-    if (serialCount > 20) { // Wait up to 2 seconds
+    if (serialCount >= 20) { // Wait up to 2 seconds
       Serial.println("Serial port not available - continuing without serial output");
       break;
     }
   }
-  delay(5000);
+  delay(1000);*/
+
   // Set CPU frequency explicitly for power optimization
   #if defined(BOARD_TYPE_XIAOC6)
-    setCpuFrequencyMhz(80); // Reduce CPU frequency to 80MHz for better battery life    
+    //setCpuFrequencyMhz(80); // Reduce CPU frequency to 80MHz for better battery life    
+  esp_pm_config_t pm_config = {
+    .max_freq_mhz = 80,
+    .min_freq_mhz = 10,
+    .light_sleep_enable = true
+  };
+  esp_pm_configure(&pm_config);
   #else
     setCpuFrequencyMhz(80); // Reduce CPU frequency to 80MHz for better battery life    
   #endif
@@ -115,20 +142,12 @@ void setup() {
     Serial.printf("Free PSRAM before BLE init: %u bytes\n", ESP.getFreePsram());
   #endif
 
-  try {
-    //#if !defined(BOARD_TYPE_XIAOC6)
-        
-      bluetoothScale.begin();  // Initialize BLE without scale reference
-      Serial.println("BLE initialized successfully - GaggiMate should be able to connect");
-    //#endif
-    #ifdef BOARD_HAS_PSRAM
-      Serial.printf("Free PSRAM after BLE init: %u bytes\n", ESP.getFreePsram());
-    #endif
-  } catch (...) {
-    Serial.println("BLE initialization failed - continuing without Bluetooth");
-    Serial.printf("Free heap after BLE fail: %u bytes\n", ESP.getFreeHeap());
-  }
-  
+  Serial.printf("Timestamp - Before Display: %lums, Total %lums\n",millis() - startTime, millis() - totalStartupTime);
+  startTime = millis();
+
+  // start scale while it takes time to start other devices
+  scale.begin();
+    
   // Initialize display with error handling - don't block if display fails
   Serial.println("Initializing display...");
   bool displayAvailable = oledDisplay.begin();
@@ -143,6 +162,26 @@ void setup() {
     oledDisplay.setBrightness(1);  // 50% brightness vs 255 max
     Serial.println("Display brightness set to 50% for power optimization");
   }
+
+  Serial.printf("Timestamp - After Display: %lums, Total %lums\n",millis() - startTime, millis() - totalStartupTime);
+  startTime = millis();
+
+  try {
+    //#if !defined(BOARD_TYPE_XIAOC6)
+        
+      bluetoothScale.begin();  // Initialize BLE without scale reference
+      Serial.println("BLE initialized successfully - GaggiMate should be able to connect");
+    //#endif
+    #ifdef BOARD_HAS_PSRAM
+      Serial.printf("Free PSRAM after BLE init: %u bytes\n", ESP.getFreePsram());
+    #endif
+  } catch (...) {
+    Serial.println("BLE initialization failed - continuing without Bluetooth");
+    Serial.printf("Free heap after BLE fail: %u bytes\n", ESP.getFreeHeap());
+  }
+  
+  Serial.printf("Timestamp - After Bluetooth: %lums, Total %lums\n",millis() - startTime, millis() - totalStartupTime);
+  startTime = millis();
   
   // Check wake-up reason and show appropriate message
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -150,7 +189,7 @@ void setup() {
     case ESP_SLEEP_WAKEUP_EXT0:
       Serial.println("Wakeup caused by external signal (touch sensor)");
       // Show the same starting message as normal boot for consistency
-      delay(1500);
+      //delay(1500);
       break;
     case ESP_SLEEP_WAKEUP_EXT1:
       Serial.println("Wakeup caused by external signal using RTC_CNTL");
@@ -164,39 +203,16 @@ void setup() {
     default:
       Serial.println("Wakeup was not caused by deep sleep: " + String(wakeup_reason));
       // For normal startup, the begin() method already shows a startup message
-      delay(1000);
+      //delay(1000);
       break;
   }
   //Wait for BLE to finish intitalizing before starting WiFi
-  delay(1500); 
-  
-  // Initialize WiFi power management BEFORE any WiFi operations
-  Serial.println("Initializing WiFi power management...");
-  
-  // CRITICAL: Force WiFi completely off first to ensure clean state
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-  delay(1000); // Allow hardware to fully reset
-  
-  // Debug: Uncomment the next line to force reset WiFi state for testing
-  // resetWiFiEnabledState(); // DISABLED - state has been cleared
-  
-  // ALWAYS enable WiFi power management for optimal battery life
-  WiFi.setSleep(true);
-  Serial.println("WiFi power management enabled for battery optimization");
-  
-  // CRITICAL: Always setup WiFi first (like tare button scenario)
-  // This ensures all WiFi subsystems are properly initialized
-  // Then disable it cleanly if needed (replicating tare button sequence)
-  Serial.println("FORCING WiFi initialization to replicate tare button scenario...");
-  setupWiFiForced(); // Use forced setup to bypass state checks
+  delay(100); //1500); 
 
-  // Wait for WiFi to fully stabilize after BLE is already running
-  delay(1500);
-  Serial.printf("Version: %s\n", ESP.getSdkVersion());
   // Initialize scale with error handling - don't block web server if HX711 fails
   Serial.println("Initializing scale...");
-  if (!scale.begin()) {
+
+  if (!scale.init()) {
     Serial.println("WARNING: Scale (HX711) initialization failed!");
     Serial.println("Web server will continue to run, but scale readings will not be available.");
     Serial.println("Check HX711 wiring and connections.");
@@ -205,6 +221,9 @@ void setup() {
     // Now that scale is ready, set the reference in BluetoothScale
     bluetoothScale.setScale(&scale);
   }
+
+  Serial.printf("Timestamp - After Scale: %lums, Total %lums\n",millis() - startTime, millis() - totalStartupTime);
+  startTime = millis();
   
   // BLE was initialized earlier - no need to initialize again
   // bluetoothScale.begin(&scale);
@@ -274,24 +293,77 @@ void setup() {
   // Link flow rate to touch sensor for averaging reset on tare
   touchSensor.setFlowRate(&flowRate);
 
-  setupWebServer(scale, flowRate, bluetoothScale, oledDisplay, batteryMonitor);
-  
-  // CRITICAL: After full initialization, check if WiFi should be disabled
-  // This exactly replicates the tare button scenario: WiFi started, then disabled
-  Serial.println("=== POST-INITIALIZATION WiFi STATE CHECK ===");
-  if (!loadWiFiEnabledState()) {
-    Serial.println("WiFi should be disabled - applying clean shutdown like tare button");
-    Serial.println("(WiFi was initialized first, now disabling cleanly)");
-    
-    // Small delay to ensure all systems are stable (like tare button timing)
-    delay(100);
-    
-    // Now call disableWiFi() exactly like tare button does
-    disableWiFi();
-    
-    Serial.println("WiFi cleanly disabled - 0.05A power consumption expected");
-  } else {
-    Serial.println("WiFi should remain enabled - no action needed");
+  //bluetoothScale.end();
+
+  Serial.printf("Timestamp - End: %lums, Total %lums\n",millis() - startTime, millis() - totalStartupTime);
+}
+
+void initWifi() {
+  static unsigned long wifiTime = 0;
+
+  switch(wifiState) {
+    case kInit:
+      // Initialize WiFi power management BEFORE any WiFi operations
+      Serial.println("Initializing WiFi power management...");
+      
+      // CRITICAL: Force WiFi completely off first to ensure clean state
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      wifiState = kStarting;
+      wifiTime = millis();
+      return;
+    case kInitWait: 
+      if(millis() - wifiTime > 1000) {
+        wifiState = kStarting;
+      }
+      return;
+    case kStarting:
+      // ALWAYS enable WiFi power management for optimal battery life
+      WiFi.setSleep(true);
+      Serial.println("WiFi power management enabled for battery optimization");
+
+      // CRITICAL: Always setup WiFi first (like tare button scenario)
+      // This ensures all WiFi subsystems are properly initialized
+      // Then disable it cleanly if needed (replicating tare button sequence)
+      Serial.println("FORCING WiFi initialization to replicate tare button scenario...");
+      setupWiFiNonBlocking(); // Use forced setup to bypass state checks
+      wifiState = kStartWait;
+      return;
+    case kStartWait:
+      // Wait for WiFi to fully stabilize after BLE is already running
+      
+      if(setupWiFiNonBlocking()) {
+          wifiState = kConnected;
+      }
+      return;
+    case kConnected:
+      Serial.printf("Version: %s\n", ESP.getSdkVersion());
+      setupWebServer(scale, flowRate, bluetoothScale, oledDisplay, batteryMonitor);
+        // CRITICAL: After full initialization, check if WiFi should be disabled
+      // This exactly replicates the tare button scenario: WiFi started, then disabled
+      Serial.println("=== POST-INITIALIZATION WiFi STATE CHECK ===");
+      if (!loadWiFiEnabledState()) {
+        Serial.println("WiFi should be disabled - applying clean shutdown like tare button");
+        Serial.println("(WiFi was initialized first, now disabling cleanly)");
+        
+        // Small delay to ensure all systems are stable (like tare button timing)
+        delay(100);
+        
+        // Now call disableWiFi() exactly like tare button does
+        disableWiFi();
+        
+        Serial.println("WiFi cleanly disabled - 0.05A power consumption expected");
+        wifiState = kDisabled;
+      } 
+      else {
+        Serial.println("WiFi should remain enabled - no action needed");
+        wifiState = kActive;
+      }
+      return;
+    case kActive:
+      return;
+    case kDisabled:
+      return;
   }
 }
 
@@ -331,14 +403,19 @@ void loop() {
   
   static unsigned long lastBLEUpdate = 0;
   
-  // Check WiFi status every 30 seconds for debugging
-  if (millis() - lastWiFiCheck >= 30000) {
-    printWiFiStatus();
-    lastWiFiCheck = millis();
+  if(wifiState < kActive) {
+    initWifi();
   }
-  
-  // Maintain WiFi AP stability
-  maintainWiFi();
+  else {
+    // Check WiFi status every 30 seconds for debugging
+    if (millis() - lastWiFiCheck >= 30000) {
+      printWiFiStatus();
+      lastWiFiCheck = millis();
+    }
+    
+    // Maintain WiFi AP stability
+    maintainWiFi();
+  }
   
   // Update Bluetooth less frequently to reduce BLE interference and power usage
   if (millis() - lastBLEUpdate >= 100) { // Reduced from 50ms to 100ms (10Hz from 20Hz)
@@ -368,6 +445,5 @@ void loop() {
   }
   
   // Increased delay for better power efficiency while maintaining responsiveness
-  delay(10); // Optimized delay: 10ms for good responsiveness with power savings
-  yield();
+    delay(100); // Optimized delay: 10ms for good responsiveness with power savings
 }

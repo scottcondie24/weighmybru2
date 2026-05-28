@@ -5,6 +5,21 @@
 #include <EEPROM.h>
 #include "WebServer.h"  // For web server control
 
+enum wifi_connect {
+    kInit,
+    kInitWait,
+    kStartingSTA,
+    kStartingAP,
+    kStartWait,
+    kConnecting,
+    kWaiting,
+    kConnected,
+    kActive,
+    kDisabled,
+};
+
+wifi_connect wifiStartup = kInit;
+
 // ESP-IDF includes for advanced WiFi power management (SuperMini antenna fix)
 #ifdef ESP_IDF_VERSION_MAJOR
     #include "esp_wifi.h"
@@ -430,6 +445,187 @@ void setupWiFiForced() {
     } else {
         Serial.println("ERROR: AP failed to start - hardware or RF issue suspected");
     }
+}
+
+bool setupWiFiNonBlocking() {
+    static unsigned long wifiTime = 0;
+    static int connectionAttempts = 0;
+    const int maxAttempts = 240; // 12 seconds total - more time for reliable connection
+    static char ssid[33] = {0};
+    static char password[65] = {0};
+    static bool apStarted = false;
+
+    switch(wifiStartup) {
+        case kInit:
+            Serial.println("=== WiFi INITIALIZATION ===");
+
+            loadWiFiCredentials(ssid, password, sizeof(ssid));
+            
+            // Ensure WiFi is completely reset first
+            Serial.println("=== WIFI ANTENNA OPTIMIZATION ===");
+            Serial.println("Resetting WiFi subsystem...");
+            WiFi.disconnect(true);
+            WiFi.mode(WIFI_OFF);
+            wifiStartup = kInitWait;
+            return false;
+        case kInitWait:
+            if(millis() - wifiTime > 500) {// Longer delay for complete reset
+                if(strlen(ssid) > 0) {
+                    wifiStartup = kStartingSTA;// Check if we have stored credentials - prioritize STA connection
+                }
+                else {
+                    Serial.println("=== NO STORED CREDENTIALS ===");
+                    Serial.println("No WiFi credentials found - starting AP mode for initial setup");
+                    wifiStartup = kStartingAP;
+                }
+
+                if (ENABLE_SUPERMINI_ANTENNA_FIX) {// Apply SuperMini antenna fix for boards with poor antenna design
+                    applySuperMiniAntennaFix();
+                }
+            }
+            return false;
+        case kStartingSTA:
+            Serial.println("=== ATTEMPTING STA CONNECTION ===");
+            Serial.println("Found stored credentials for: " + String(ssid));
+            Serial.println("Trying STA mode first (power optimized)...");
+            
+            // Try STA mode first for lower power consumption
+            WiFi.mode(WIFI_STA);
+            wifiStartup = kStartWait;
+            return false;
+        case kStartWait:
+            if(millis() - wifiTime > 1000) {// Ensure mode switch is stable
+                if (ENABLE_SUPERMINI_ANTENNA_FIX) {
+                    applySuperMiniAntennaFix();
+                }
+            
+                startAttemptTime = millis();
+                WiFi.begin(ssid, password);
+                
+                // Wait for connection with reasonable timeout
+                connectionAttempts = 0;
+                
+                Serial.print("Connecting");
+                wifiStartup = kConnecting;
+            }
+            return false;
+        case kConnecting: 
+            // ANTENNA FIX: Reapply power settings after mode switch for SuperMini boards
+            // Mode switch can reset power levels, so reapply the fix
+            if (connectionAttempts == maxAttempts) {
+                Serial.println("\nSTA CONNECTION FAILED");
+                Serial.println("Status code: " + String(WiFi.status()));
+                Serial.println("Falling back to AP mode for configuration...");
+                wifiStartup = kStartingAP;
+                return false;
+            }
+
+            if (WiFi.status() != WL_CONNECTED) {
+                delay(50);
+                Serial.print(".");
+                connectionAttempts++;
+                
+                // Check for immediate connection failures
+                if (WiFi.status() == WL_NO_SSID_AVAIL) {
+                    Serial.println("\nNetwork '" + String(ssid) + "' not found");
+                    wifiStartup = kStartingAP;
+                    break;
+                }
+                if (WiFi.status() == WL_CONNECT_FAILED) {
+                    Serial.println("\nConnection failed - likely incorrect password");
+                    wifiStartup = kStartingAP;
+                    break;
+                }
+            }
+            else {
+                Serial.println("\nSTA CONNECTION SUCCESSFUL!");
+                Serial.println("===========================");
+                Serial.println("Connected to: " + String(ssid));
+                Serial.println("IP Address: " + WiFi.localIP().toString());
+                Serial.println("Gateway: " + WiFi.gatewayIP().toString());
+                Serial.println("DNS: " + WiFi.dnsIP().toString());
+                Serial.println("Signal: " + String(WiFi.RSSI()) + " dBm");
+                Serial.println("AP mode disabled - optimized for low power");
+                Serial.println("Will auto-fallback to AP if connection lost");
+                Serial.println("===========================");
+                
+                // Setup mDNS for STA mode
+                setupmDNS();
+                wifiStartup = kConnected;
+            } 
+            return false;
+        case kStartingAP:
+            // Fallback to AP mode if STA failed or no credentials exist
+            Serial.println("Starting AP mode...");
+            WiFi.mode(WIFI_AP);
+            delay(1000); // Ensure mode switch is stable
+            
+            // Configure AP with optimized settings for maximum visibility
+            WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
+            
+            // Start AP with power-optimized settings for battery efficiency
+            Serial.println("Starting AP for credential configuration (power optimized)...");
+            
+            // Try channel 6 first (most common and widely supported)
+            // Reduced max clients from 4 to 2 for lower power consumption
+            apStarted = WiFi.softAP(ap_ssid, ap_password, 6, false, 2); // Channel 6, broadcast SSID, max 2 clients
+            
+            if (apStarted) {
+                // Apply AP-specific power optimizations to reduce battery consumption
+                applyAPModePowerOptimization();
+                
+                Serial.println("AP started successfully on channel 6 (power optimized)");
+            } 
+            else {
+                Serial.println("Channel 6 failed, trying channel 1...");
+                apStarted = WiFi.softAP(ap_ssid, ap_password, 1, false, 2); // Channel 1, broadcast SSID, max 2 clients
+                
+                if (apStarted) {
+                    // Apply AP-specific power optimizations
+                    applyAPModePowerOptimization();
+                    Serial.println("AP started successfully on channel 1 (power optimized)");
+                } else {
+                    Serial.println("Channel 1 failed, trying default settings...");
+                    apStarted = WiFi.softAP(ap_ssid); // Simplest possible configuration
+                    if (apStarted) {
+                        Serial.println("AP started with default settings");
+                        // Still apply power optimization even with default settings
+                        applyAPModePowerOptimization();
+                    }
+                }
+            }
+            
+            if (apStarted) {
+                // Apply AP mode power optimizations for battery efficiency
+                applyAPModePowerOptimization();
+                
+                Serial.println("=== AP MODE ACTIVE (POWER OPTIMIZED) ===");
+                Serial.println("AP SSID: " + String(ap_ssid));
+                Serial.println("AP IP: " + WiFi.softAPIP().toString());
+                Serial.println("AP MAC: " + WiFi.softAPmacAddress());
+                Serial.printf("AP Channel: %d\n", WiFi.channel());
+                Serial.printf("WiFi TX Power: %d dBm (optimized for battery)\n", WiFi.getTxPower());
+                Serial.println("Max Clients: 2 (reduced for power savings)");
+                Serial.println("Beacon Interval: 200ms (increased for power savings)");
+                Serial.println("Connect to 'WeighMyBru-AP' to configure WiFi");
+                Serial.println("Access: http://192.168.4.1 or http://weighmybru.local");
+                Serial.println("========================================");
+                
+                // Setup mDNS for AP mode
+                setupmDNS();
+                wifiStartup = kConnected;
+            } else {
+                Serial.println("ERROR: AP failed to start - hardware or RF issue suspected");
+                wifiStartup = kDisabled;
+            }
+            return false;
+        case kConnected: 
+            return true;
+        case kDisabled:
+            return true;
+    }
+
+    return false;
 }
 
 void setupmDNS() {
