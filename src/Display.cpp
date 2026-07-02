@@ -113,9 +113,28 @@ bool Display::begin() {
 }
 
 void Display::drawDisplay() {
+    // show touch
     display->drawPixel(0,SCREEN_HEIGHT - 1,currentSleepTouchState);
     display->drawPixel(SCREEN_WIDTH - 1,SCREEN_HEIGHT - 1,currentTouchState);
     
+    // show edges
+    //display->drawPixel(0,0,HIGH);
+    //display->drawPixel(SCREEN_WIDTH - 1,0,HIGH);
+    //display->drawPixel(0,SCREEN_HEIGHT - 1,HIGH);
+    //display->drawPixel(SCREEN_WIDTH - 1,SCREEN_HEIGHT - 1,HIGH);
+
+    // show battery
+    if (batteryPtr) {
+        int batteryPercentage = batteryPtr->getBatteryPercentage();
+        // Draw battery percentage as a bar along the left side with gaps at 25% 50% and 75%
+        int barHeight = map(batteryPercentage, 0, 100, 0, 30);
+        display->drawFastVLine(0, 30 - barHeight, barHeight + 1, SSD1306_WHITE);
+        // Draw gaps at 25%, 50%, and 75%
+        display->drawPixel(0, 7, SSD1306_BLACK);
+        display->drawPixel(0, 15, SSD1306_BLACK);
+        display->drawPixel(0, 23, SSD1306_BLACK);
+    }
+
     display->display();
 }
 
@@ -848,10 +867,12 @@ void Display::showWeightWithFlowAndTimer(float weight) {
         // Draw weight with custom decimal point - positioned at left middle
         display->setTextSize(3);
         int weightY = 5; // Middle of 32-pixel screen (size 3 text is ~21px tall, so (32-21)/2 ≈ 5)
-        display->setCursor(0, weightY);
+        
+        int currentX = 4;
+        display->setCursor(currentX, weightY);
         
         // Draw negative sign if needed
-        int currentX = 0;
+        
         if (isNegative) {
             display->print("-");
             // Calculate width of "-" in size 3
@@ -931,12 +952,13 @@ void Display::showWeightWithFlowAndTimer(float weight) {
         int16_t x1, y1, x2, y2; 
         uint16_t textWidthInt, textHeightInt, textWidthDec, textHeightDec;
         display->getTextBounds(weightStrInt, 0, 0, &x1, &y1, &textWidthInt, &textHeightInt);
-        display->setCursor(0, 0);
+        int currentX = 4;
+        display->setCursor(currentX, 0);
         display->print(weightStrInt);
         if(!(isNegative && integerPart >= 1000)) {
             display->setTextSize(2);
             display->getTextBounds(weightStrDec, 0, 0, &x2, &y2, &textWidthDec, &textHeightDec);
-            display->setCursor(textWidthInt, textHeightInt-textHeightDec); // Position decimal part immediately after integer part
+            display->setCursor(currentX + textWidthInt, textHeightInt-textHeightDec); // Position decimal part immediately after integer part
             display->print(weightStrDec);
         }
     }
@@ -1170,11 +1192,11 @@ void Display::showStatusPage() {
     // Battery percentage (left) - without "BAT:" prefix
     if (batteryPtr != nullptr) {
         int batteryPercent = batteryPtr->getBatteryPercentage();
-        display->setCursor(0, 0);
+        display->setCursor(4, 0);
         display->print(batteryPercent);
         display->print("%");
     } else {
-        display->setCursor(0, 0);
+        display->setCursor(4, 0);
         display->print("N/A");
     }
     
@@ -1189,10 +1211,12 @@ void Display::showStatusPage() {
     
     // Bluetooth status (right) - BT text with rectangle border when connected
     display->setCursor(110, 0);
-    display->print("BT");
-    if (bluetoothPtr != nullptr && bluetoothPtr->isConnected()) {
-        // Draw rectangle around "BT" when connected (with proper spacing)
-        display->drawRect(108, -1, 16, 10, SSD1306_WHITE); // Rectangle around "BT"
+    if(bluetoothPtr->getStatus()) {
+        display->print("BT");
+        if (bluetoothPtr != nullptr && bluetoothPtr->isConnected()) {
+            // Draw rectangle around "BT" when connected (with proper spacing)
+            display->drawRect(108, -1, 16, 10, SSD1306_WHITE); // Rectangle around "BT"
+        }
     }
     
     // Bottom line: WiFi mode and IP address (moved to very bottom)
@@ -1200,15 +1224,15 @@ void Display::showStatusPage() {
     
     // Check WiFi power state first
     if (!isWiFiEnabled()) {
-        display->setCursor(0, 24);  // Bottom of 32-pixel display
+        display->setCursor(4, 24);  // Bottom of 32-pixel display
         display->print("WiFi: OFF");
     } else if (WiFi.status() == WL_CONNECTED) {
-        display->setCursor(0, 24);  // Bottom of 32-pixel display
+        display->setCursor(4, 24);  // Bottom of 32-pixel display
         display->print("STA: ");
         display->print(WiFi.localIP().toString());
     } else {
         // AP mode is active
-        display->setCursor(0, 24);  // Bottom of 32-pixel display
+        display->setCursor(4, 24);  // Bottom of 32-pixel display
         display->print("AP: ");
         display->print(WiFi.softAPIP().toString());
     }

@@ -354,6 +354,10 @@ void initWifi() {
         
         Serial.println("WiFi cleanly disabled - 0.05A power consumption expected");
         wifiState = kDisabled;
+        bluetoothScale.end();
+        delay(100);
+        setCpuFrequencyMhz(10); // ESP plus 1 touch sensor: 10MHz 13.6mA, 20MHz 14.6mA, 40MHz 17.8mA, 80MHz 26.4mA, 160MHz 31.3mA, 240MHz 37.1mA - reduce CPU frequency for power optimization when WiFi and bluetooth are off
+        Serial.printf("CPU frequency set to: %dMHz for power optimization\n", getCpuFrequencyMhz());
       } 
       else {
         Serial.println("WiFi should remain enabled - no action needed");
@@ -445,5 +449,5 @@ void loop() {
   }
   
   // Increased delay for better power efficiency while maintaining responsiveness
-    delay(100); // Optimized delay: 10ms for good responsiveness with power savings
+    delay(10); // Optimized delay: 10ms for good responsiveness with power savings
 }

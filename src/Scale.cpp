@@ -172,7 +172,9 @@ float Scale::getWeight() {
         return currentWeight;  // Return last known value if not ready
     }
     
+    noInterrupts();
     float rawReading = hx711.get_units(1);
+    interrupts();
     
     // Handle NaN or invalid readings
     if (isnan(rawReading)) {
@@ -267,7 +269,11 @@ long Scale::getRawValue() {
     if (!isConnected) {
         return 0;  // Return 0 if HX711 not connected
     }
-    return hx711.get_value(1); // Get raw value from HX711
+    noInterrupts();
+    long raw_value = hx711.get_value(1); // Get raw value from HX711
+    interrupts();
+
+    return raw_value;
 }
 
 void Scale::initializeSamples(float initialValue) {

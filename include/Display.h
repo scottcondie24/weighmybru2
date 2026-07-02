@@ -68,10 +68,10 @@ private:
     bool displayConnected; // Track if display is actually connected
     
     static const uint8_t SCREEN_WIDTH = 128;
-    static const uint8_t SCREEN_HEIGHT = 32;
+    static const uint8_t SCREEN_HEIGHT = 32; //64;
     static const uint8_t OLED_RESET = -1; // Reset pin not used
     static const uint8_t SCREEN_ADDRESS = 0x3C; // Common I2C address for SSD1306
-    static const uint8_t SSD1312 = false; // remaps memory buffer
+    static const uint8_t SSD1312 = false; //true; // remaps memory buffer
     
     unsigned long messageStartTime;
     int messageDuration; // Store the duration for each message

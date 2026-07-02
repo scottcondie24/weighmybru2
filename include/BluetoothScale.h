@@ -36,6 +36,7 @@ public:
     void handleTimerCommand(BeanConquerorCommand command);
     int getBluetoothSignalStrength(); // Get BLE signal strength (RSSI)
     String getBluetoothConnectionInfo(); // Get detailed BLE connection information
+    bool getStatus(); // Get current status of BluetoothScale 
     
     // BLE Server callbacks
     void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override;

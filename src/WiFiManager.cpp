@@ -450,7 +450,7 @@ void setupWiFiForced() {
 bool setupWiFiNonBlocking() {
     static unsigned long wifiTime = 0;
     static int connectionAttempts = 0;
-    const int maxAttempts = 240; // 12 seconds total - more time for reliable connection
+    const int maxAttempts = 1200; // 12 seconds total - more time for reliable connection
     static char ssid[33] = {0};
     static char password[65] = {0};
     static bool apStarted = false;
@@ -521,7 +521,7 @@ bool setupWiFiNonBlocking() {
             }
 
             if (WiFi.status() != WL_CONNECTED) {
-                delay(50);
+                delay(10);
                 Serial.print(".");
                 connectionAttempts++;
                 
@@ -558,7 +558,7 @@ bool setupWiFiNonBlocking() {
             // Fallback to AP mode if STA failed or no credentials exist
             Serial.println("Starting AP mode...");
             WiFi.mode(WIFI_AP);
-            delay(1000); // Ensure mode switch is stable
+            delay(100); // Ensure mode switch is stable
             
             // Configure AP with optimized settings for maximum visibility
             WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
@@ -1254,7 +1254,12 @@ void disableWiFi() {
 void toggleWiFi() {
     if (isWiFiEnabled() && WiFi.getMode() != WIFI_OFF) {
         disableWiFi();
-    } else {
+        //bluetoothPtr->end();
+    } 
+    else {
+        setCpuFrequencyMhz(80);
+        delay(100);
         enableWiFi();
+        //bluetoothPtr->begin();
     }
 }

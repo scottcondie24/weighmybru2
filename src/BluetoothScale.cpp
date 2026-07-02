@@ -81,8 +81,12 @@ void BluetoothScale::begin(Scale* scaleInstance) {
 
 void BluetoothScale::end() {
     if (server) {
+        Serial.println("Stopping Advertising");
         stopAdvertising();
+        delay(50);
         NimBLEDevice::deinit();
+        Serial.println("Bluetooth deinitialised");
+        delay(50);
         server = nullptr;
         service = nullptr;
         weightCharacteristic = nullptr;
@@ -221,7 +225,7 @@ void BluetoothScale::stopAdvertising() {
 
 void BluetoothScale::update() {
     // Return early if initialization failed
-    if (scale == nullptr) {
+    if (scale == nullptr || server == nullptr) {
         return;
     }
     
@@ -537,6 +541,10 @@ void BluetoothScale::setScale(Scale* scaleInstance) {
 void BluetoothScale::setDisplay(Display* displayInstance) {
     display = displayInstance;
     Serial.println("BluetoothScale: Display reference set");
+}
+
+bool BluetoothScale::getStatus() {
+    return server != nullptr;
 }
 
 // Get BLE signal strength (RSSI)
